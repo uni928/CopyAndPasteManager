@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>コピ＆ペースト管理</title>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --panel: #15171d;
+      --panel-2: #1e212a;
+      --text: #e8eef7;
+      --muted: #a9b3c1;
+      --primary: #4da3ff;
+      --primary-2: #2b7ee5;
+      --danger: #ff5c5c;
+      --border: #2a2f3a;
+      --ring: #4da3ff55;
+      --radius: 12px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --panel-2: #f3f5f9;
+        --text: #111827;
+        --muted: #4b5563;
+        --primary: #2563eb;
+        --primary-2: #1e40af;
+        --danger: #dc2626;
+        --border: #e5e7eb;
+        --ring: #2563eb33;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background: radial-gradient(1200px 800px at 20% -10%, #0d3a6d33, transparent),
+                  radial-gradient(1200px 800px at 120% 120%, #3a0d6d33, transparent),
+                  var(--bg);
+      font: 14px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+      letter-spacing: 0.2px;
+    }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: saturate(1.1) blur(6px);
+      background: color-mix(in oklab, var(--bg) 85%, transparent);
+      border-bottom: 1px solid var(--border);
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 18px 16px; }
+    .title-row {
+      display: flex; align-items: center; gap: 12px; justify-content: space-between; flex-wrap: wrap;
+    }
+    h1 {
+      margin: 0; font-size: 18px; letter-spacing: 0.4px; font-weight: 700;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .badge {
+      font-size: 12px; color: var(--muted);
+      border: 1px solid var(--border); padding: 3px 8px; border-radius: 999px;
+    }
+    .actions { display: flex; gap: 10px; align-items: center; }
+    button, .btn {
+      appearance: none; border: 1px solid var(--border); background: var(--panel);
+      color: var(--text); padding: 9px 14px; border-radius: 10px; cursor: pointer;
+      transition: 120ms background, 120ms transform, 120ms border-color, 120ms box-shadow;
+    }
+    button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+    .btn-primary {
+      background: linear-gradient(180deg, color-mix(in oklab, var(--primary) 96%, white 4%), var(--primary-2));
+      color: white; border: none;
+    }
+    .btn-primary:hover { transform: translateY(-1px); }
+    .btn-ghost { background: var(--panel-2); }
+    .btn-danger { background: color-mix(in oklab, var(--danger) 85%, black 5%); color: white; border: none; }
+    main { max-width: 980px; margin: 16px auto 64px; padding: 0 16px; }
+
+    .list { display: flex; flex-direction: column; gap: 10px; }
+    .item {
+      background: linear-gradient(180deg, var(--panel), color-mix(in oklab, var(--panel) 80%, black 5%));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      display: grid; gap: 10px;
+      grid-template-columns: 34px 1fr auto;
+      align-items: stretch;
+      box-shadow: 0 3px 14px #00000022;
+    }
+    .item.dragging { opacity: 0.6; border-style: dashed; }
+    .handle {
+      display: flex; align-items: center; justify-content: center; user-select: none;
+      width: 34px; height: 100%; border-radius: 8px; background: var(--panel-2); border: 1px dashed var(--border);
+      cursor: grab;
+    }
+    .handle:active { cursor: grabbing; }
+    .handle .icon { font-size: 18px; letter-spacing: 2px; color: var(--muted); }
+
+    textarea.text {
+      width: 100%; min-height: 84px; resize: vertical; padding: 10px 12px;
+      color: var(--text); background: var(--panel-2);
+      border: 1px solid var(--border); border-radius: 10px; outline: none;
+      transition: 120ms border-color, 120ms box-shadow;
+    }
+    textarea.text:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+    .btns { display: flex; align-items: start; gap: 8px; flex-wrap: wrap; }
+    .btn-small { padding: 8px 12px; border-radius: 9px; }
+    .muted { color: var(--muted); font-size: 12px; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(16px);
+      background: var(--panel); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 14px; border-radius: 10px; box-shadow: 0 8px 26px #0000003a;
+      opacity: 0; pointer-events: none; transition: 160ms opacity, 200ms transform;
+      z-index: 50;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* responsive */
+    @media (max-width: 720px) {
+      .item { grid-template-columns: 28px 1fr; }
+      .btns { grid-column: 1 / -1; }
+      .handle { width: 28px; }
+    }
+
+    /* screen-reader only */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="title-row">
+        <h1>コピ＆ペースト管理 <span id="store-badge" class="badge" title="保存先">Saving…</span></h1>
+        <div class="actions">
+          <button id="add-btn" class="btn btn-primary" aria-label="入力欄を追加">＋ 追加</button>
+          <button id="add-from-clipboard" class="btn btn-ghost" aria-label="クリップボードから追加">📋 クリップボードから</button>
+        </div>
+      </div>
+      <div class="muted" style="margin-top:6px">
+        左端の≡をドラッグで上下に並べ替え／入力は自動保存（IndexedDB）
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="list" class="list" aria-live="polite" aria-label="スニペット一覧"></div>
+  </main>
+
+  <template id="item-tpl">
+    <div class="item" data-id="">
+      <div class="handle" role="button" aria-label="ドラッグして並べ替え">
+        <span class="icon" aria-hidden="true">≡</span>
+      </div>
+      <textarea class="text" placeholder="ここにテキストを入力／ペースト…"></textarea>
+      <div class="btns">
+        <button class="btn btn-small btn-ghost copy-btn" aria-label="この内容をコピー">コピー</button>
+        <button class="btn btn-small btn-danger del-btn" aria-label="この項目を削除">削除</button>
+      </div>
+    </div>
+  </template>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">コピーしました</div>
+  <div id="sr-live" class="sr-only" aria-live="polite"></div>
+
+  <script>
+    // ========= 設定 =========
+    const DB_NAME = 'CopyPasteManager';
+    const DB_VERSION = 1;
+    const STORE = 'state';
+    const STATE_KEY = 'v1';
+    const LS_KEY = 'copyPasteManagerState';
+
+    // ========= ユーティリティ =========
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const debounce = (fn, ms=250) => {
+      let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+    };
+    const uuid = () => (crypto?.randomUUID?.() ?? `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`);
+
+    function toast(msg) {
+      const el = $('#toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 1200);
+      const sr = $('#sr-live'); sr.textContent = msg;
+    }
+
+    async function copyText(text) {
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          // フォールバック
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.focus(); ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        toast('コピーしました');
+      } catch (err) {
+        console.error(err);
+        toast('コピーに失敗しました');
+      }
+    }
+
+    // ========= ストレージ層（IndexedDB / localStorage 自動切替） =========
+    let storageMode = 'idb'; // 'idb' | 'ls'
+    let idb = null;
+
+    async function openDB() {
+      if (!('indexedDB' in window)) throw new Error('IndexedDB not supported');
+      return await new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE)) {
+            db.createObjectStore(STORE, { keyPath: 'key' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('IndexedDB open error'));
+      });
+    }
+
+    async function prepareStorage() {
+      try {
+        idb = await openDB();
+        storageMode = 'idb';
+      } catch (e) {
+        console.warn('IndexedDB を利用できません。localStorage にフォールバックします。', e);
+        storageMode = 'ls';
+      }
+      updateStoreBadge();
+    }
+
+    function updateStoreBadge() {
+      const badge = $('#store-badge');
+      badge.textContent = storageMode === 'idb' ? 'IndexedDB' : 'localStorage';
+      badge.title = `保存先: ${badge.textContent}`;
+    }
+
+    async function loadState() {
+      if (storageMode === 'idb') {
+        return await new Promise((resolve, reject) => {
+          try {
+            const tx = idb.transaction(STORE, 'readonly');
+            const store = tx.objectStore(STORE);
+            const req = store.get(STATE_KEY);
+            req.onsuccess = () => resolve(req.result?.value ?? { snippets: [] });
+            req.onerror = () => reject(req.error);
+          } catch (e) { reject(e); }
+        }).catch(() => ({ snippets: [] }));
+      } else {
+        try {
+          const raw = localStorage.getItem(LS_KEY);
+          return raw ? JSON.parse(raw) : { snippets: [] };
+        } catch {
+          return { snippets: [] };
+        }
+      }
+    }
+
+    async function saveState(state) {
+      if (storageMode === 'idb') {
+        await new Promise((resolve, reject) => {
+          try {
+            const tx = idb.transaction(STORE, 'readwrite');
+            const store = tx.objectStore(STORE);
+            const putReq = store.put({ key: STATE_KEY, value: state, ts: Date.now() });
+            putReq.onsuccess = () => resolve();
+            putReq.onerror = () => reject(putReq.error);
+          } catch (e) { reject(e); }
+        }).catch(err => console.error('保存に失敗:', err));
+      } else {
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify(state));
+        } catch (e) {
+          console.error('localStorage 保存に失敗:', e);
+        }
+      }
+    }
+
+    const saveStateDebounced = debounce(() => saveState(gatherStateFromDOM()), 250);
+
+    // ========= DOM ⇄ 状態 =========
+    function gatherStateFromDOM() {
+      const snippets = $$('.item', $('#list')).map(el => ({
+        id: el.dataset.id,
+        text: $('.text', el).value
+      }));
+      return { snippets };
+    }
+
+    function renderFromState(state) {
+      const list = $('#list');
+      list.innerHTML = '';
+      if (!state?.snippets?.length) {
+        addItem({ text: '' });
+        return;
+      }
+      state.snippets.forEach(sn => addItem(sn));
+    }
+
+    // ========= アイテム生成・イベント =========
+    function addItem({ id = uuid(), text = '' } = {}) {
+      const tpl = $('#item-tpl');
+      const node = tpl.content.firstElementChild.cloneNode(true);
+      node.dataset.id = id;
+
+      const ta = $('.text', node);
+      ta.value = text;
+      ta.addEventListener('input', () => {
+        // リアルタイム保存（軽負荷のためデバウンス）
+        saveStateDebounced();
+      });
+
+      // コピー
+      $('.copy-btn', node).addEventListener('click', () => copyText(ta.value));
+
+      // 削除
+      $('.del-btn', node).addEventListener('click', () => {
+        node.remove();
+        saveStateDebounced();
+      });
+
+      // ドラッグ操作（ハンドルからのみ開始）
+      const handle = $('.handle', node);
+      handle.addEventListener('pointerdown', () => { node.draggable = true; }, { passive: true });
+      node.addEventListener('dragstart', (e) => {
+        node.classList.add('dragging');
+        e.dataTransfer?.setData('text/plain', node.dataset.id);
+        e.dataTransfer?.setDragImage(new Image(), 0, 0); // 透明イメージで見やすく
+      });
+      node.addEventListener('dragend', () => {
+        node.classList.remove('dragging');
+        node.draggable = false;
+        saveStateDebounced();
+      });
+
+      $('#list').appendChild(node);
+      return node;
+    }
+
+    // リスト側のドラッグ位置決定
+    $('#list').addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const list = e.currentTarget;
+      const dragging = $('.item.dragging', list);
+      if (!dragging) return;
+
+      const after = getDragAfterElement(list, e.clientY);
+      if (after == null) {
+        list.appendChild(dragging);
+      } else {
+        list.insertBefore(dragging, after);
+      }
+    });
+
+    function getDragAfterElement(container, y) {
+      const els = $$('.item:not(.dragging)', container);
+      let closest = { offset: Number.NEGATIVE_INFINITY, el: null };
+      for (const el of els) {
+        const box = el.getBoundingClientRect();
+        const offset = y - (box.top + box.height / 2);
+        if (offset < 0 && offset > closest.offset) closest = { offset, el };
+      }
+      return closest.el;
+    }
+
+    // ========= クリップボードからの追加 =========
+    async function addFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        const node = addItem({ text });
+        await saveState(gatherStateFromDOM());
+        $('.text', node).focus();
+        toast('クリップボードから追加しました');
+      } catch (e) {
+        toast('クリップボードの読み取りに失敗しました');
+        console.warn(e);
+      }
+    }
+
+    // ========= 初期化 =========
+    async function init() {
+      await prepareStorage();
+      const state = await loadState();
+      renderFromState(state);
+
+      $('#add-btn').addEventListener('click', async () => {
+        const node = addItem({ text: '' });
+        await saveState(gatherStateFromDOM());
+        $('.text', node).focus();
+      });
+
+      $('#add-from-clipboard').addEventListener('click', addFromClipboard);
+    }
+
+    // 起動
+    init();
+  </script>
+</body>
+</html>
