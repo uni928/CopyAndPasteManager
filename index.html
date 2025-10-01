@@ -47,11 +47,11 @@
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     .pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:var(--panel-2);color:var(--muted)}
     /* 追記: ドロップ受け入れ中の強調 */
-  .drop-active {
+  /*.drop-active {
     outline: 3px dashed var(--primary);
     outline-offset: 6px;
     border-radius: 14px;
-  }
+  }*/
   </style>
 </head>
 <body>
@@ -558,18 +558,18 @@ async function init(){
     if (added) {
       persist().then(()=> toast(`${added}件 ドロップで取り込みました`));
     }
-    $('#list').classList.remove('drop-active');
+    //$('#list').classList.remove('drop-active');
   }
 
   function handleDragOver(e){
     // ファイルを受け取れることを明示
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
     e.preventDefault();
-    $('#list').classList.add('drop-active');
+    //$('#list').classList.add('drop-active');
   }
 
   function handleDragLeave(){
-    $('#list').classList.remove('drop-active');
+    //$('#list').classList.remove('drop-active');
   }
 
 init();
